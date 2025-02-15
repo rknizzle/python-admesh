@@ -17,7 +17,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        #python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
 
     steps:
       - name: Checkout repository
@@ -39,7 +40,7 @@ jobs:
 
       - name: Download and Compile ADMesh
         env:
-          ADMESH_VERSION: "0.98.3"
+          ADMESH_VERSION: "0.98.5"
         run: |
           wget https://github.com/admesh/admesh/releases/download/v$ADMESH_VERSION/admesh-$ADMESH_VERSION.tar.gz
           tar -zxf admesh-$ADMESH_VERSION.tar.gz
@@ -71,19 +72,19 @@ jobs:
           name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
           path: dist/
 
-  publish-pypi:
-    name: Publish to PyPI
-    needs: build-wheels
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release'
+  #publish-pypi:
+  #  name: Publish to PyPI
+  #  needs: build-wheels
+  #  runs-on: ubuntu-latest
+  #  if: github.event_name == 'release'
 
-    steps:
-      - name: Download built wheels
-        uses: actions/download-artifact@v4
-        with:
-          path: dist
+  #  steps:
+  #    - name: Download built wheels
+  #      uses: actions/download-artifact@v4
+  #      with:
+  #        path: dist
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+  #    - name: Publish to PyPI
+  #      uses: pypa/gh-action-pypi-publish@release/v1
+  #      with:
+  #        password: ${{ secrets.PYPI_API_TOKEN }}
