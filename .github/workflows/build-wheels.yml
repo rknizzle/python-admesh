@@ -16,8 +16,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # macos-13 is Intel, macos-14 is Apple Silicon
-        #os: [ubuntu-latest, macos-13, macos-14]
+        #os: [ubuntu-latest, windows-latest, macos-13, macos-14]
         os: [ubuntu-latest]
 
     steps:
@@ -33,26 +32,13 @@ jobs:
             brew install wget cmake
           fi
 
-      - name: Download and Compile ADMesh
-        env:
-          ADMESH_VERSION: "0.98.3"
-        run: |
-          wget https://github.com/admesh/admesh/releases/download/v$ADMESH_VERSION/admesh-$ADMESH_VERSION.tar.gz
-          tar -zxf admesh-$ADMESH_VERSION.tar.gz
-          cd admesh-$ADMESH_VERSION
-          ./configure
-          make
-          mkdir -p src/admesh
-          cp src/stl.h src/admesh/stl.h
-          cd ..
-          echo "ADMesh installed successfully!"
-
       - name: Build wheels using cibuildwheel
         uses: pypa/cibuildwheel@v2.22.0
         env:
-          #cibw_build: "cp37-* cp38-* cp39-* cp310-* cp311-* cp312-*"
-          cibw_build: "cp38-* cp39-* cp310-* cp311-* cp312-*"
+          CIBW_BUILD: "cp37-* cp38-* cp39-* cp310-* cp311-* cp312-*"
           CIBW_SKIP: "pp*"
+          CIBW_BEFORE_BUILD_LINUX: |
+            sudo apt update && sudo apt install -y libadmesh-dev
           CIBW_TEST_REQUIRES: "pytest"
           CIBW_TEST_COMMAND: "pytest -v {project}/test"
 
@@ -62,19 +48,19 @@ jobs:
           name: cibw-wheels-${{ matrix.os }}
           path: ./wheelhouse/*.whl
 
-  #publish_pypi:
-  #  name: Publish to PyPI
-  #  needs: build_wheels
-  #  runs-on: ubuntu-latest
-  #  if: github.event_name == 'release'
+  publish_pypi:
+    name: Publish to PyPI
+    needs: build_wheels
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
 
-  #  steps:
-  #    - name: Download built wheels
-  #      uses: actions/download-artifact@v4
-  #      with:
-  #        path: dist
+    steps:
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
 
-  #    - name: Publish to PyPI
-  #      uses: pypa/gh-action-pypi-publish@release/v1
-  #      with:
-  #        password: ${{ secrets.PYPI_API_TOKEN }}
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
