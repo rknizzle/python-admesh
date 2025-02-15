@@ -11,25 +11,19 @@ on:
     types: [created]
 
 jobs:
-  build-wheels:
-    name: Build Wheels on ${{ matrix.os }} - Python ${{ matrix.python-version }}
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-13, macos-14]
-        #python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
-        python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        # macos-13 is Intel, macos-14 is Apple Silicon
+        os: [ubuntu-latest, windows-latest, macos-13, macos-14]
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Install system build dependencies (Linux & macOS)
+      - name: Install system build dependencies
         run: |
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo apt update
@@ -40,7 +34,7 @@ jobs:
 
       - name: Download and Compile ADMesh
         env:
-          ADMESH_VERSION: "0.98.5"
+          ADMESH_VERSION: "0.98.3"
         run: |
           wget https://github.com/admesh/admesh/releases/download/v$ADMESH_VERSION/admesh-$ADMESH_VERSION.tar.gz
           tar -zxf admesh-$ADMESH_VERSION.tar.gz
@@ -52,29 +46,24 @@ jobs:
           cd ..
           echo "ADMesh installed successfully!"
 
-      - name: Install Python dependencies
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install cibuildwheel pytest
-
       - name: Build wheels using cibuildwheel
-        run: |
-          python -m cibuildwheel --output-dir dist
-
-      - name: Test built wheels
-        run: |
-          pip install --no-index --find-links=dist admesh
-          pytest -v test/
+        uses: pypa/cibuildwheel@v2.22.0
+        env:
+          #cibw_build: "cp37-* cp38-* cp39-* cp310-* cp311-* cp312-*"
+          cibw_build: "cp38-* cp39-* cp310-* cp311-* cp312-*"
+          CIBW_SKIP: "pp*"
+          CIBW_TEST_REQUIRES: "pytest"
+          CIBW_TEST_COMMAND: "pytest -v {project}/test"
 
       - name: Upload built wheels as artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: dist/
+          name: cibw-wheels-${{ matrix.os }}
+          path: ./wheelhouse/*.whl
 
-  #publish-pypi:
+  #publish_pypi:
   #  name: Publish to PyPI
-  #  needs: build-wheels
+  #  needs: build_wheels
   #  runs-on: ubuntu-latest
   #  if: github.event_name == 'release'
 
