@@ -1,0 +1,89 @@
+name: Build Wheels
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  release:
+    types: [created]
+
+jobs:
+  build-wheels:
+    name: Build Wheels on ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install system build dependencies (Linux & macOS)
+        run: |
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt update
+            sudo apt install -y build-essential wget tar cmake
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install wget cmake
+          fi
+
+      - name: Download and Compile ADMesh
+        env:
+          ADMESH_VERSION: "0.98.3"
+        run: |
+          wget https://github.com/admesh/admesh/releases/download/v$ADMESH_VERSION/admesh-$ADMESH_VERSION.tar.gz
+          tar -zxf admesh-$ADMESH_VERSION.tar.gz
+          cd admesh-$ADMESH_VERSION
+          ./configure
+          make
+          mkdir -p src/admesh
+          cp src/stl.h src/admesh/stl.h
+          cd ..
+          echo "ADMesh installed successfully!"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cibuildwheel pytest
+
+      - name: Build wheels using cibuildwheel
+        run: |
+          python -m cibuildwheel --output-dir dist
+
+      - name: Test built wheels
+        run: |
+          pip install --no-index --find-links=dist admesh
+          pytest -v test/
+
+      - name: Upload built wheels as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: dist/
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: build-wheels
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+      - name: Download built wheels
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
