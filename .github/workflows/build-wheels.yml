@@ -12,13 +12,37 @@ on:
 
 jobs:
   # TODO: Test before wheel building
+  test:
+    name: Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install admesh
+      # TODO: Do I need to install wget?
+        run: |
+          if [ ! -f admesh-$ADMESH/.libs/admesh ]; then
+            wget https://github.com/admesh/admesh/releases/download/v$ADMESH/admesh-$ADMESH.tar.gz;
+            tar -zxf admesh-$ADMESH.tar.gz;
+            cd admesh-$ADMESH;
+            "./configure";
+            make;
+            mkdir src/admesh;
+            cp src/stl.h src/admesh/stl.h;
+            cd ..;
+          fi
+
+          python -m pip install tox Cython
+          LD_LIBRARY_PATH=$PWD/admesh-$ADMESH/.libs LDFLAGS=-L$PWD/admesh-$ADMESH/.libs CFLAGS=-I$PWD/admesh-$ADMESH/src tox
 
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        #os: [ubuntu-latest, windows-latest, macos-13, macos-14]
         os: [ubuntu-latest]
 
     steps:
@@ -34,12 +58,10 @@ jobs:
             brew install wget cmake
           fi
 
-        # TODO: Musl? Does the original project use musllinux? No its just manylinux
       - name: Build wheels using cibuildwheel
         uses: pypa/cibuildwheel@v2.22.0
         env:
-          #CIBW_BUILD: "cp37-* cp38-* cp39-* cp310-* cp311-* cp312-*"
-          #CIBW_BUILD: "cp38-*_x86_64 cp39-*_x86_64 cp310-*_x86_64 cp311-*_x86_64 cp312-*_x86_64"
+          # Build CPython and PyPy wheels for x86_64 linux
           CIBW_BUILD: "*p3*-manylinux_x86_64"
           CIBW_BEFORE_BUILD_LINUX: |
             rpm -q admesh-devel || yum install -y --nogpgcheck /project/travis/*.x86_64.rpm; pip install Cython
